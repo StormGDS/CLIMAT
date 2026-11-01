@@ -30,6 +30,7 @@ void service_set_relay_driver(uint8_t (*driver)(uint8_t))
 static void tick(uint32_t now) {control_tick(&control,now);apply_relays();}
 static uint8_t device_name[3];
 static SettingsBackend storage;
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
 static int (*bt_handler)(const char *);
 void service_set_bt_handler(int (*handler)(const char *)) {bt_handler=handler;}
 static void (*report_fn)(uint32_t);
@@ -37,18 +38,23 @@ static void (*out)(const char *);
 static volatile uint8_t queue[128], head, tail, damaged;
 static char line[96];
 static unsigned used, discard, stream;
+#endif
 static PhoneLink phone;
 static void (*phone_output)(const uint8_t *,unsigned);
 static volatile uint8_t phone_queue[128],phone_head,phone_tail,phone_damaged;
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
 static uint8_t phone_test;
+#endif
 static int (*phone_filter)(uint8_t,uint32_t);
 void service_set_phone_filter(int (*filter)(uint8_t,uint32_t)) {phone_filter=filter;}
 void service_device_name(uint8_t name[3]) {memcpy(name,device_name,3);}
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
 static void status(uint32_t now);
 static const char *settings_reason(SettingsResult r)
 {
   return r==SETTINGS_OK?"VALID":r==SETTINGS_EMPTY?"EMPTY":r==SETTINGS_INVALID?"INVALID":"IO_ERROR";
 }
+#endif
 static void settings_current(Settings *s)
 {
   s->heater_min_on_seconds=control.heater_min_on_seconds;s->fan_min_on_seconds=control.fan_min_on_seconds;
@@ -180,10 +186,13 @@ static unsigned phone_dispatch(void *context, uint8_t op, const uint8_t *p,
 static void phone_send(void *context, const uint8_t *p, unsigned n)
 {
   (void)context;
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
   if(phone_test) {
     char text[3];out("PHONE TX ");
     for(unsigned i=0;i<n;++i) {(void)snprintf(text,sizeof(text),"%02X",p[i]);out(text);}out("\r\n");
-  } else if(phone_output) phone_output(p,n);
+  } else
+#endif
+  if(phone_output) phone_output(p,n);
 }
 void service_phone_init(void (*send)(const uint8_t *,unsigned))
 {phone_output=send;phone_init(&phone,phone_dispatch,phone_send,0);}
@@ -198,7 +207,9 @@ void service_phone_poll(uint32_t now)
 {
   phone_tick(&phone,now);
   if(phone_damaged) {phone_damaged=0;phone_tail=phone_head;phone_loss(&phone);}
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
   if(phone_test) {phone_tail=phone_head;return;}
+#endif
   for(unsigned budget=0;budget<64 && phone_tail!=phone_head;++budget) {
     uint8_t b=phone_queue[phone_tail];phone_tail=(uint8_t)((phone_tail+1U)&127U);
     if(phone_filter && phone_filter(b,now)) continue;
@@ -206,6 +217,7 @@ void service_phone_poll(uint32_t now)
     if(phone_damaged) {phone_damaged=0;phone_tail=phone_head;phone_loss(&phone);break;}
   }
 }
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
 static int hex_digit(char c)
 {return c>='0'&&c<='9'?c-'0':c>='A'&&c<='F'?c-'A'+10:c>='a'&&c<='f'?c-'a'+10:-1;}
 
@@ -217,16 +229,24 @@ void service_rx_byte(uint8_t b)
 }
 void service_rx_error(void) { damaged=1; }
 unsigned service_stream_enabled(void) { return stream; }
+#endif
 void service_init(TemperatureProbe *p, void (*r)(uint32_t), void (*o)(const char *), SettingsBackend io)
 {
-  probe=p; report_fn=r; out=o; storage=io;
+  probe=p; storage=io;
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
+  report_fn=r; out=o;
+#else
+  (void)r;(void)o;
+#endif
   if(relay_driver) (void)relay_driver(0);
   relay_driver=0;physical_mask=0;control_init(&control,0);
   Settings s;SettingsResult result=settings_load(storage,&s);
   if(result!=SETTINGS_OK) settings_defaults(&s);
   settings_apply(&s,0);
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
   out(CLI_TEXT("BOOT ","SETTINGS BOOT source="));out(result==SETTINGS_OK?"FLASH":"DEFAULT");
   out(" reason=");out(settings_reason(result));out("\r\n");
+#endif
 }
 void service_sample(uint32_t now)
 {
@@ -236,8 +256,11 @@ void service_sample(uint32_t now)
     s->valid && !control.manual,s->raw16,s->trend_valid,s->rate_milli_per_min,
     control.logical,now);
   tick(now);
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
   if(stream) status(now);
+#endif
 }
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
 static void status(uint32_t now)
 {
   char s[224];
@@ -457,10 +480,12 @@ static void command(uint32_t now)
   }
   else out(CLI_TEXT("ERR\r\n","ERR UNKNOWN_COMMAND\r\n"));
 }
+#endif
 void service_poll(uint32_t now)
 {
   tick(now);
   if(control.fault) auto_reset(&automatic);
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
   /* Limit work even under a continuous sender; no dynamic allocation. */
   for(unsigned budget=0;budget<128;++budget) {
     if(damaged) {damaged=0;tail=head;used=0;discard=1;out(CLI_TEXT("ERR\r\n","ERR RX_LOSS_RESEND_AFTER_NEWLINE\r\n"));}
@@ -475,4 +500,5 @@ void service_poll(uint32_t now)
       else {used=0;discard=1;out(CLI_TEXT("ERR\r\n","ERR LINE_TOO_LONG_OR_BINARY\r\n"));}
     }
   }
+#endif
 }

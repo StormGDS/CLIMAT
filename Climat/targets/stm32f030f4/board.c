@@ -3,13 +3,11 @@
 #include "board_config.h"
 #include "service_console.h"
 #include "bt_boot.h"
-#include "tiny_format.h"
 #include <string.h>
 uint32_t SystemCoreClock=48000000U;
 static volatile uint32_t ticks;
 static TemperatureProbe probe;
 static BtBoot bluetooth;
-static uint8_t service_mode;
 extern uint32_t _stack_limit,_estack;
 extern uint8_t __config_start__,__config_end__;
 #define CONFIG_ADDRESS 0x08003C00U
@@ -50,7 +48,6 @@ static int uart_send(const uint8_t *p, unsigned n)
   return 1;
 }
 static void uart_write(const uint8_t *p, unsigned n) {(void)uart_send(p,n);}
-static void console(const char *p) {if(service_mode) uart_write((const uint8_t *)p,(unsigned)strlen(p));}
 static int bt_send(void *context, const char *p)
 {(void)context;return uart_send((const uint8_t *)p,(unsigned)strlen(p));}
 static int bt_filter(uint8_t byte, uint32_t now) {return bt_boot_byte(&bluetooth,byte,now);}
@@ -60,27 +57,11 @@ void USART1_IRQHandler(void)
   if(status&(USART_ISR_ORE|USART_ISR_FE|USART_ISR_NE|USART_ISR_PE)) {
     USART1->ICR=USART_ICR_ORECF|USART_ICR_FECF|USART_ICR_NCF|USART_ICR_PECF;
     if(status&USART_ISR_RXNE) (void)USART1->RDR;
-    if(service_mode) service_rx_error();else service_phone_loss();
+    service_phone_loss();
   } else if(status&USART_ISR_RXNE) {
     uint8_t b=(uint8_t)USART1->RDR;
-    if(service_mode) service_rx_byte(b);else service_phone_byte(b);
+    service_phone_byte(b);
   }
-}
-static void report(uint32_t now)
-{
-  char text[144];
-  for(unsigned i=0;i<2;++i) {
-    ProbeSensor *s=&probe.sensor[i];
-    tiny_snprintf(text,sizeof(text),"t=%lu S%u V%u T16=%d R%u dT=%ld E%lu\r\n",
-      (unsigned long)now,i+1,s->valid,s->raw16,s->trend_valid,(long)s->rate_milli_per_min,
-      (unsigned long)s->errors);console(text);
-  }
-}
-static unsigned stack_used(void)
-{
-  const uint32_t *p=&_stack_limit,*end=&_estack;
-  while(p<end && *p==CANARY) ++p;
-  return (unsigned)((const uint8_t *)end-(const uint8_t *)p);
 }
 /* Logical bits 0..3 map to PA1..PA4. Reset OFF before setting ON. */
 static uint8_t relay_apply(uint8_t mask)
@@ -89,12 +70,6 @@ static uint8_t relay_apply(uint8_t mask)
   RELAY_GPIO->BSRR=(RELAY_PIN_MASK & ~pins)<<16;
   RELAY_GPIO->BSRR=pins;
   return (uint8_t)((RELAY_GPIO->ODR>>1)&15U);
-}
-static int bt_status(const char *command)
-{
-  if(strcmp(command,"BT STATUS")) return 0;
-  char text[112];tiny_snprintf(text,sizeof(text),"F030 HIGH stack=%u/%u\r\n",stack_used(),F030_STACK_BYTES);
-  console(text);return 1;
 }
 static int flash_read(uint8_t *b)
 {
@@ -155,13 +130,10 @@ static void hardware_init(void)
     RELAY_GPIO->MODER=(RELAY_GPIO->MODER&~(3U<<(2*pin)))|(1U<<(2*pin));
   release();ONEWIRE_GPIO->OTYPER|=1U<<ONEWIRE_PIN;
   ONEWIRE_GPIO->MODER=(ONEWIRE_GPIO->MODER&~(3U<<(2*ONEWIRE_PIN)))|(1U<<(2*ONEWIRE_PIN));
-  SERVICE_GPIO->MODER&=~(3U<<(2*SERVICE_PIN));
-  SERVICE_GPIO->PUPDR=(SERVICE_GPIO->PUPDR&~(3U<<(2*SERVICE_PIN)))|(1U<<(2*SERVICE_PIN));
-  delay_us(10);service_mode=(uint8_t)(!(SERVICE_GPIO->IDR&(1U<<SERVICE_PIN)));
   GPIOA->MODER=(GPIOA->MODER&~((3U<<18)|(3U<<20)))|(2U<<18)|(2U<<20);
   GPIOA->AFR[1]=(GPIOA->AFR[1]&~((15U<<4)|(15U<<8)))|(1U<<4)|(1U<<8);
   GPIOA->PUPDR=(GPIOA->PUPDR&~(3U<<20))|(1U<<20);
-  RCC->APB2ENR|=RCC_APB2ENR_USART1EN;USART1->BRR=48000000U/(service_mode?115200U:9600U);
+  RCC->APB2ENR|=RCC_APB2ENR_USART1EN;USART1->BRR=48000000U/9600U;
   USART1->CR3=USART_CR3_EIE;USART1->CR1=USART_CR1_UE|USART_CR1_TE|USART_CR1_RE|USART_CR1_RXNEIE|USART_CR1_PEIE;
   NVIC_SetPriority(USART1_IRQn,1);NVIC_EnableIRQ(USART1_IRQn);
   SysTick_Config(48000);NVIC_SetPriority(SysTick_IRQn,3);
@@ -175,16 +147,16 @@ int main(void)
   for(volatile uint32_t *p=&_stack_limit;p<guard;++p) *p=CANARY;
   *guard=0;
   hardware_init();ProbeBus bus={ow_reset,ow_write,ow_read,now_ms};probe_init(&probe,bus);
-  SettingsBackend storage={flash_read,flash_write};service_init(&probe,report,console,storage);
+  SettingsBackend storage={flash_read,flash_write};service_init(&probe,0,0,storage);
   service_set_relay_driver(relay_apply);
-  service_phone_init(uart_write);service_set_bt_handler(bt_status);
-  if(!service_mode) {
+  service_phone_init(uart_write);
+  {
     uint8_t name[3];service_device_name(name);bt_boot_init(&bluetooth,name,ticks,bt_send,0);service_set_phone_filter(bt_filter);
   }
   uint32_t fed=ticks;
   for(;;) {
-    service_poll(ticks);if(!service_mode) {service_phone_poll(ticks);bt_boot_poll(&bluetooth,ticks);}
-    if(probe_poll(&probe,ticks)) {service_sample(ticks);if(service_stream_enabled()) report(ticks);}
+    service_poll(ticks);service_phone_poll(ticks);bt_boot_poll(&bluetooth,ticks);
+    if(probe_poll(&probe,ticks)) service_sample(ticks);
     if(*(volatile uint32_t *)&_stack_limit!=CANARY) fatal();
     if((uint32_t)(ticks-fed)>=100) {watchdog();fed=ticks;}
   }

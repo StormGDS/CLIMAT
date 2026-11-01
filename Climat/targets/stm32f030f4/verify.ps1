@@ -36,7 +36,9 @@ for($i=0;$i -lt $sections.Length-1;++$i) {
 if($symbols.Keys -match '^(malloc|calloc|realloc|free|_sbrk|snprintf|strtol|__aeabi_[ul]*ldivmod|__divdi3|__udivdi3)$'){throw 'Unexpected heap/large runtime helper'}
 $ramCode=@(& (Join-Path $ToolchainPath 'arm-none-eabi-objdump.exe') -d -j .data $elf)
 if($LASTEXITCODE -or !($ramCode -match '<flash_program') -or ($ramCode -match '\sblx?\s')){throw 'RAM flash writer missing or contains a call'}
+if($symbols.Keys -match '^(command|service_rx_byte|service_rx_error|service_stream_enabled|service_set_bt_handler|report|console|bt_status)$'){throw 'Service console unexpectedly linked'}
 $report=[ordered]@{
+  serviceConsoleEnabled=$false; pa5Used=$false
   target='STM32F030F4P6'; boardRoutingApproved=$true; physicalRelaysLocked=$false
   programFlashBytes=$bytes.Length; programFlashLimit=15360; programFlashFree=15360-$bytes.Length
   settingsPageStart='0x08003C00'; settingsPageBytes=1024; settingsPageInImage=$false

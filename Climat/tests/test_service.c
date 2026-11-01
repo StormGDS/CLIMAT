@@ -24,8 +24,10 @@ static unsigned request(unsigned op,const uint8_t *p,unsigned n,uint8_t *respons
      phone_crc16(raw,decoded-2)!=(unsigned)(raw[decoded-2]|((unsigned)raw[decoded-1]<<8))) return 0;
   memcpy(response,raw+5,raw[4]);return raw[4];
 }
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
 static void cli(const char *s,uint32_t now)
 {while(*s) service_rx_byte((uint8_t)*s++);service_rx_byte('\n');service_poll(now);}
+#endif
 uint32_t service_selftest(void)
 {
   uint32_t e=0;TemperatureProbe probe;ProbeBus bus={0};SettingsBackend io={read_flash,write_flash};
@@ -55,6 +57,7 @@ uint32_t service_selftest(void)
   memcpy(saved,p+1,31);saved[2]=saved[3]=0; /* zero hysteresis */
   if(request(5,saved,31,p,0)!=1 || p[0]!=PHONE_BAD_CONFIG) e|=512;
   if(request(4,0,0,p,0)!=40 || p[3]!=8 || p[17]!=0xe8 || p[18]!=3) e|=1024;
+#ifndef CLIMAT_NO_SERVICE_CONSOLE
   /* CLI edits use the same model, including the full uint16 speed range. */
   cli("AUTO SET 176 8 168 8 400 16 560 16 65535",0);
   if(request(4,0,0,p,0)!=40 || p[17]!=255 || p[18]!=255) e|=2048;
@@ -62,6 +65,16 @@ uint32_t service_selftest(void)
   if(request(4,0,0,p,0)!=40 || p[17]!=255 || p[18]!=255) e|=4096;
   cli("SENSOR CLEAR 1",0);
   if(request(14,0,0,p,0)!=17 || p[1] || memcmp(p+9,rom+8,8)) e|=8192;
+#else
+  /* Same edits through v3, with no text parser linked. */
+  if(request(4,0,0,p,0)!=40) e|=2048;
+  memcpy(saved,p+1,31);saved[16]=255;saved[17]=255;
+  if(request(5,saved,31,p,0)!=1 || p[0] ||
+     request(4,0,0,p,0)!=40 || p[17]!=255 || p[18]!=255) e|=4096;
+  memcpy(saved,rom,16);memset(saved,0,8);
+  if(request(15,saved,16,p,0)!=1 || p[0] ||
+     request(14,0,0,p,0)!=17 || p[1] || memcmp(p+9,rom+8,8)) e|=8192;
+#endif
   if(request(7,0,0,p,0)!=1 || p[0] || request(14,0,0,p,0)!=17 || memcmp(p+1,rom,16)) e|=16384;
   if(request(3,0,0,p,0)!=43) e|=32768;
   if(request(8,0,0,p,0)!=1 || p[0] || request(14,0,0,p,0)!=17 || p[1] || p[9]) e|=65536;

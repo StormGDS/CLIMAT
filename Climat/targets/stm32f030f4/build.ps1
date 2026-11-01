@@ -15,7 +15,7 @@ $cmsis=Join-Path $CubeF0Path 'Drivers\CMSIS\Include'
 if(!(Test-Path -LiteralPath (Join-Path $device 'stm32f030x6.h'))){throw 'Supply -CubeF0Path for installed STM32CubeF0'}
 $flags=@('-mcpu=cortex-m0','-mthumb','-std=gnu11',$Optimize,'-g3','-Wall','-Wextra','-Werror',
   '-ffunction-sections','-fdata-sections','-fno-common','-fno-unwind-tables','-fno-asynchronous-unwind-tables',
-  '-fstack-usage','-DSTM32F030x6','-DCLIMAT_COMPACT','-DCLIMAT_PRODUCTION',
+  '-fstack-usage','-DCLIMAT_NO_SERVICE_CONSOLE','-DSTM32F030x6','-DCLIMAT_COMPACT','-DCLIMAT_PRODUCTION',
   '-I',(Join-Path $root 'Core\Inc'),'-I',$PSScriptRoot,'-I',$device,'-I',$cmsis)
 if(!$NoLto){$flags+='-flto'}
 $sources=@('auto_control','control_core','temperature_probe','settings','phone_link','bt_boot','service_console','tiny_format')|
