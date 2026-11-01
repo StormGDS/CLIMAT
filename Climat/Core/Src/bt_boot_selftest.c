@@ -3,9 +3,9 @@
 #include <stdio.h>
 typedef struct {
   char reply[64],name[11],uuid[5],characteristic[5];
-  unsigned role,calls,pending,drop_ack,ignore_role,fail_tx,unsupported;
+  unsigned role,calls,pending,drop_ack,ignore_role,fail_tx,version_variant;
   uint32_t uart_baud,module_baud;
-  unsigned baud_calls,fail_baud,noise;
+  unsigned baud_calls,fail_baud,noise,profile_error;
 } Module;
 static void module_init(Module *m)
 {
@@ -22,7 +22,15 @@ static int module_send(void *context, const char *cmd)
   }
   if(!strcmp(cmd,"AT\r\n")) strcpy(m->reply,"OK\r\n");
   else if(!strcmp(cmd,"AT+RESET\r\n")) strcpy(m->reply,"OK\r\n");
-  else if(!strcmp(cmd,"AT+VERSION\r\n")) strcpy(m->reply,m->unsupported?"+VERSION=v9.9\r\n":"+VERSION=v6.1\r\n");
+  else if(!strcmp(cmd,"AT+VERSION\r\n")) {
+    strcpy(m->reply,m->version_variant==1?"+VERSION=v9.9\r\n":
+      m->version_variant==2?"ERROR\r\n":m->version_variant==4?"Firmware custom-2026\r\n":"+VERSION=v6.1\r\n");
+    if(m->version_variant==3) m->pending=0;
+  }
+  else if((m->profile_error==1 && !strcmp(cmd,"AT+ROLE\r\n")) ||
+          (m->profile_error==2 && !strcmp(cmd,"AT+NAME\r\n")) ||
+          (m->profile_error==3 && !strcmp(cmd,"AT+UUID\r\n")) ||
+          (m->profile_error==4 && !strcmp(cmd,"AT+CHAR\r\n"))) strcpy(m->reply,"ERROR\r\n");
   else if(!strcmp(cmd,"AT+ROLE\r\n")) (void)snprintf(m->reply,sizeof(m->reply),"+ROLE=%u\r\n",m->role);
   else if(!strcmp(cmd,"AT+NAME\r\n")) (void)snprintf(m->reply,sizeof(m->reply),"+NAME=%s\r\n",m->name);
   else if(!strcmp(cmd,"AT+UUID\r\n")) (void)snprintf(m->reply,sizeof(m->reply),"+UUID=%s\r\n",m->uuid);
@@ -57,16 +65,16 @@ uint32_t bt_boot_selftest(void)
   uint32_t e=0;BtBoot b;Module m;const uint8_t name[3]={'A','0','1'};
   module_init(&m);bt_boot_init(&b,name,0,module_send,&m);bt_boot_poll(&b,499);
   if(m.calls) e|=1;
-  simulate(&b,&m,500);if(b.state!=BT_READY || b.writes || m.calls!=6 || !b.present) e|=2;
+  simulate(&b,&m,500);if(b.state!=BT_READY || b.writes || m.calls!=10 || !b.present) e|=2;
   module_init(&m);m.role=1;strcpy(m.name,"OLD");strcpy(m.uuid,"1234");strcpy(m.characteristic,"5678");
   bt_boot_init(&b,name,0,module_send,&m);simulate(&b,&m,500);
-  if(b.state!=BT_READY || b.writes!=4 || m.calls!=25 || !b.reset_done || strcmp(m.name,"CLM-413031")) e|=4;
+  if(b.state!=BT_READY || b.writes!=4 || m.calls!=29 || !b.reset_done || strcmp(m.name,"CLM-413031")) e|=4;
   module_init(&m);bt_boot_init(&b,name,0,module_send,&m);
   bt_boot_poll(&b,500);m.pending=0;bt_boot_poll(&b,850);m.pending=0;bt_boot_poll(&b,1200);
   if(b.state!=BT_NO_AT || b.present || m.calls!=2) e|=8;
   bt_boot_poll(&b,9000);if(m.calls!=2) e|=16;
-  module_init(&m);m.unsupported=1;bt_boot_init(&b,name,0,module_send,&m);simulate(&b,&m,500);
-  if(b.state!=BT_UNSUPPORTED || b.writes || m.calls!=2) e|=32;
+  module_init(&m);m.version_variant=1;bt_boot_init(&b,name,0,module_send,&m);simulate(&b,&m,500);
+  if(b.state!=BT_READY || b.writes || m.calls!=10) e|=32;
   module_init(&m);m.role=1;m.ignore_role=1;bt_boot_init(&b,name,0,module_send,&m);simulate(&b,&m,500);
   if(b.state!=BT_FAILED || b.writes!=1) e|=64;
   module_init(&m);m.role=1;m.drop_ack=1;bt_boot_init(&b,name,0,module_send,&m);simulate(&b,&m,500);
@@ -103,9 +111,9 @@ uint32_t bt_boot_selftest(void)
   module_init(&m);m.module_baud=38400;m.noise=1;
   bt_boot_init(&b,name,0,module_send,&m);bt_boot_set_uart(&b,module_baud);simulate(&b,&m,500);
   if(b.state!=BT_READY || b.baud!=38400) e|=524288;
-  module_init(&m);m.module_baud=115200;m.unsupported=1;
+  module_init(&m);m.module_baud=115200;m.version_variant=1;
   bt_boot_init(&b,name,0,module_send,&m);bt_boot_set_uart(&b,module_baud);simulate(&b,&m,500);
-  if(b.state!=BT_UNSUPPORTED || b.baud!=115200 || b.writes) e|=1048576;
+  if(b.state!=BT_READY || b.baud!=115200 || b.writes) e|=1048576;
   module_init(&m);m.module_baud=19200;m.fail_baud=1;
   bt_boot_init(&b,name,0,module_send,&m);bt_boot_set_uart(&b,module_baud);simulate(&b,&m,500);
   if(b.state!=BT_FAILED || b.writes) e|=2097152;
@@ -128,5 +136,21 @@ uint32_t bt_boot_selftest(void)
   module_init(&m);bt_boot_init(&b,name,0,module_send,&m);bt_boot_set_uart(&b,module_baud);
   bt_boot_poll(&b,13000);
   if(b.state!=BT_FAILED || m.calls || m.baud_calls) e|=67108864;
+  for(unsigned version=0;version<=4;++version) {
+    module_init(&m);m.version_variant=version;m.role=1;strcpy(m.name,"OLD");
+    bt_boot_init(&b,name,0,module_send,&m);simulate(&b,&m,500);
+    if(b.state!=BT_READY || b.writes!=2 || !b.profile_checked || strcmp(m.name,"CLM-413031")) e|=134217728;
+  }
+  for(unsigned capability=1;capability<=4;++capability) {
+    module_init(&m);m.version_variant=1;m.role=1;m.profile_error=capability;
+    bt_boot_init(&b,name,0,module_send,&m);simulate(&b,&m,500);
+    if(b.state!=BT_UNSUPPORTED || b.writes || b.profile_checked || m.role!=1) e|=268435456;
+  }
+  module_init(&m);m.role=1;strcpy(m.uuid,"BAD!");
+  bt_boot_init(&b,name,0,module_send,&m);simulate(&b,&m,500);
+  if(b.state!=BT_UNSUPPORTED || b.writes) e|=536870912;
+  module_init(&m);m.role=1;m.name[0]=0;
+  bt_boot_init(&b,name,0,module_send,&m);simulate(&b,&m,500);
+  if(b.state!=BT_UNSUPPORTED || b.writes) e|=1073741824;
   return e;
 }

@@ -9,7 +9,7 @@ typedef struct {
   char response[64],name[11];
   uint8_t state,used,present,writes,retried,reset_done,verify_next,phase;
   uint32_t started,at,last_rx,baud;
-  uint8_t baud_index;
+  uint8_t baud_index,profile_checked;
   int (*set_baud)(void *,uint32_t);
   int (*send)(void *,const char *);void *context;
 } BtBoot;

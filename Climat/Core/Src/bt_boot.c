@@ -9,7 +9,7 @@ const char *bt_boot_status(const BtBoot *b)
   if(bt_boot_busy(b)) return "CONFIGURING";
   switch(b->state) {
   case BT_READY:return "READY";case BT_NO_AT:return "NO_AT_RESPONSE";
-  case BT_UNSUPPORTED:return "UNSUPPORTED_FIRMWARE";
+  case BT_UNSUPPORTED:return "UNSUPPORTED_AT_PROFILE";
   case BT_LINK_ACTIVE:return "DATA_ALREADY_ACTIVE";default:return "FAILED";
   }
 }
@@ -71,12 +71,25 @@ static int line(const BtBoot *b, const char *prefix, const char *value)
   }
   return 0;
 }
+/* Require a nonempty value on the same line. UUID/CHAR must be 4 HEX digits. */
 static int value_present(const BtBoot *b, const char *prefix)
 {
   size_t n=strlen(prefix);
-  for(unsigned i=0;i+n<b->used;++i)
-    if((!i || b->response[i-1]=='\r' || b->response[i-1]=='\n') &&
-       !memcmp(b->response+i,prefix,n)) return 1;
+  for(unsigned i=0;i+n<b->used;++i) {
+    if(i && b->response[i-1]!='\r' && b->response[i-1]!='\n') continue;
+    if(memcmp(b->response+i,prefix,n)) continue;
+    unsigned end=i+(unsigned)n;
+    while(end<b->used && b->response[end]!='\r' && b->response[end]!='\n') ++end;
+    unsigned length=end-i-(unsigned)n;
+    if(!length) return 0;
+    if(!strcmp(prefix,"+NAME=")) return length<=32;
+    if(length!=4) return 0;
+    for(unsigned j=i+(unsigned)n;j<end;++j) {
+      char c=b->response[j];
+      if(!((c>='0' && c<='9') || (c>='A' && c<='F') || (c>='a' && c<='f'))) return 0;
+    }
+    return 1;
+  }
   return 0;
 }
 static void verify_after_write(BtBoot *b, uint32_t now)
@@ -91,17 +104,29 @@ static void response(BtBoot *b, uint32_t now)
   if(b->state==BT_PROBE && b->set_baud && !line(b,"","OK")) {
     b->used=0;b->response[0]=0;return;
   }
-  if(line(b,"","ERROR")) {b->state=b->state==BT_VERSION?BT_UNSUPPORTED:BT_FAILED;return;}
+  /* VERSION is informational: any response, including ERROR, is acceptable. */
+  if(b->state==BT_VERSION) {enter(b,BT_ROLE_READ,now);return;}
+  if(!b->profile_checked && b->state>=BT_ROLE_READ && b->state<=BT_CHAR_READ) {
+    unsigned next=BT_READY;
+    int valid=0;
+    switch(b->state) {
+    case BT_ROLE_READ:valid=line(b,"+ROLE=","0") || line(b,"+ROLE=","1");next=BT_NAME_READ;break;
+    case BT_NAME_READ:valid=value_present(b,"+NAME=");next=BT_UUID_READ;break;
+    case BT_UUID_READ:valid=value_present(b,"+UUID=");next=BT_CHAR_READ;break;
+    case BT_CHAR_READ:valid=value_present(b,"+CHAR=");next=BT_ROLE_READ;break;
+    default:break;
+    }
+    if(!valid || line(b,"","ERROR")) {b->state=BT_UNSUPPORTED;return;}
+    if(b->state==BT_CHAR_READ) b->profile_checked=1;
+    enter(b,next,now);return;
+  }
+  if(line(b,"","ERROR")) {b->state=BT_FAILED;return;}
   switch(b->state) {
   case BT_PROBE:
     if(line(b,"","OK")) {b->present=1;enter(b,BT_VERSION,now);} else b->state=BT_FAILED;
     return;
   case BT_WRITE_PROBE:
     if(line(b,"","OK")) enter(b,b->verify_next,now);else b->state=BT_FAILED;
-    return;
-  case BT_VERSION:
-    if(line(b,"+VERSION=","v6.1")) enter(b,BT_ROLE_READ,now);
-    else b->state=BT_UNSUPPORTED;
     return;
   case BT_ROLE_READ:case BT_ROLE_VERIFY:
     if(line(b,"+ROLE=","0")) enter(b,BT_NAME_READ,now);
@@ -150,6 +175,8 @@ void bt_boot_poll(BtBoot *b, uint32_t now)
   if(b->used && (uint32_t)(now-b->last_rx)>=25) {response(b,now);return;}
   if((uint32_t)(now-b->at)<350) return;
   if(setting(b->state)) {verify_after_write(b,now);return;}
+  if(b->state==BT_VERSION) {enter(b,BT_ROLE_READ,now);return;}
+  if(!b->profile_checked && b->state>=BT_ROLE_READ && b->state<=BT_CHAR_READ) {b->state=BT_UNSUPPORTED;return;}
   if(b->state==BT_PROBE || b->state==BT_WRITE_PROBE) {
     if(!b->retried) {unsigned state=b->state;enter(b,state,now);b->retried=1;}
     else if(b->state==BT_PROBE && !b->present) next_baud(b,now);

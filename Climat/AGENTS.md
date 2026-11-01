@@ -23,8 +23,8 @@ SPEC.md, PHONE_PROTOCOL_V3.md, STAGE4_FLASH.md, PROTOCOL.md. Историчес�
 - F767 CONFIG 0x08010000..0x0801FFFF, код первые64К; не менять option bytes.
   F767 физические реле разрешены active HIGH, OFF перед ON; F030: approved PA1..PA4, active HIGH, OFF before ON (2026-11-02).
   F030 pin map approved 2026-11-02. Never flash F030 image to F767.
-- BT05/v6.1 peripheral, телефон central, FFE0/FFE1. Ограниченный стартовый AT-профиль,
-  неизвестным модулям setters не посылать, PIN/baud/security/factory reset не менять.
+- BLE peripheral, телефон central, FFE0/FFE1; версия прошивки не ограничивается. Ограниченный стартовый AT-профиль,
+  Перед setters проверить весь AT-профиль ROLE/NAME/UUID/CHAR чтением. При несовместимом профиле ничего не записывать; VERSION необязателен. PIN/baud/security/factory reset не менять.
   Имя CLM-XXXXXX применять после SAVE/reset, уникальность не гарантировать автоматически.
 - После общих изменений собирать F767 (python build.py) и F030
   (targets/stm32f030f4/build.ps1), запускать tests/run_tests.py обычный и --compact.
