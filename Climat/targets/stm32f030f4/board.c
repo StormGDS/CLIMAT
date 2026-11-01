@@ -41,13 +41,25 @@ static unsigned ow_read(void)
 static int uart_send(const uint8_t *p, unsigned n)
 {
   uint32_t start=ticks;
+  uint32_t limit=(n*10000U)/(bluetooth.baud?bluetooth.baud:9600U)+30U;
   while(n--) {
-    while(!(USART1->ISR&USART_ISR_TXE)) if((uint32_t)(ticks-start)>150) {service_phone_loss();return 0;}
+    while(!(USART1->ISR&USART_ISR_TXE)) if((uint32_t)(ticks-start)>limit) {service_phone_loss();return 0;}
     USART1->TDR=*p++;
   }
   return 1;
 }
 static void uart_write(const uint8_t *p, unsigned n) {(void)uart_send(p,n);}
+static int bt_baud(void *context, uint32_t baud)
+{
+  (void)context;
+  uint32_t irq=__get_PRIMASK();__disable_irq();
+  USART1->CR1&=~USART_CR1_UE;
+  USART1->BRR=(48000000U+baud/2U)/baud;
+  USART1->ICR=USART_ICR_ORECF|USART_ICR_FECF|USART_ICR_NCF|USART_ICR_PECF;
+  USART1->RQR=USART_RQR_RXFRQ;
+  service_phone_loss();USART1->CR1|=USART_CR1_UE;
+  __set_PRIMASK(irq);return 1;
+}
 static int bt_send(void *context, const char *p)
 {(void)context;return uart_send((const uint8_t *)p,(unsigned)strlen(p));}
 static int bt_filter(uint8_t byte, uint32_t now) {return bt_boot_byte(&bluetooth,byte,now);}
@@ -151,7 +163,7 @@ int main(void)
   service_set_relay_driver(relay_apply);
   service_phone_init(uart_write);
   {
-    uint8_t name[3];service_device_name(name);bt_boot_init(&bluetooth,name,ticks,bt_send,0);service_set_phone_filter(bt_filter);
+    uint8_t name[3];service_device_name(name);bt_boot_init(&bluetooth,name,ticks,bt_send,0);bt_boot_set_uart(&bluetooth,bt_baud);service_set_phone_filter(bt_filter);
   }
   uint32_t fed=ticks;
   for(;;) {

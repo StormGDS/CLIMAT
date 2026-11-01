@@ -38,4 +38,6 @@ R=Hrate=0 и MIN_ON=30/60 — совместимые значения мигра
 CONFIG GET показывает новые значения; старый AUTO SET сохраняет R/Hrate.
 Android и HTML в этой задаче не изменялись. Отчёт: TEST_REPORT_2026-10-31.md.
 
-Ветка dev/f030-no-service-console: F030 собирается с CLIMAT_NO_SERVICE_CONSOLE; PA5 не используется. USART1 только BLE 9600 8N1. Не возвращать текстовую консоль в F030. F767 сохраняет стендовую консоль. Проверять tests/run_tests.py --no-console --compact дополнительно.
+Ветка dev/f030-no-service-console: F030 собирается с CLIMAT_NO_SERVICE_CONSOLE; PA5 не используется. USART1 только BLE 8N1; MCU автоматически подбирает скорость UART, начиная с 9600. Не возвращать текстовую консоль в F030. F767 сохраняет стендовую консоль. Проверять tests/run_tests.py --no-console --compact дополнительно.
+
+Автоподбор UART BLE: 9600/19200/38400/57600/115200/4800/2400/1200, ограничение 13 с; не менять baud самого модуля или Flash-настройки. Подробности BT_UART_AUTO.md.

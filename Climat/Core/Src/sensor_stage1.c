@@ -86,12 +86,21 @@ static void phone_arm(void)
 static void phone_transmit(const uint8_t *p, unsigned n)
 {
   /* At 9600 baud a maximum frame takes <80ms; RX IRQs stay active. */
-  if(HAL_UART_Transmit(&huart6,(uint8_t *)p,(uint16_t)n,120)!=HAL_OK) service_phone_loss();
+  if(HAL_UART_Transmit(&huart6,(uint8_t *)p,(uint16_t)n,(n*10000U)/(bluetooth.baud?bluetooth.baud:9600U)+30U)!=HAL_OK) service_phone_loss();
 }
 static int bluetooth_send(void *context, const char *command)
 {
   (void)context;
-  return HAL_UART_Transmit(&huart6,(uint8_t *)command,(uint16_t)strlen(command),50)==HAL_OK;
+  return HAL_UART_Transmit(&huart6,(uint8_t *)command,(uint16_t)strlen(command),(strlen(command)*10000U)/(bluetooth.baud?bluetooth.baud:9600U)+30U)==HAL_OK;
+}
+static int bluetooth_baud(void *context, uint32_t baud)
+{
+  (void)context;(void)HAL_UART_AbortReceive(&huart6);service_phone_loss();
+  huart6.Init.BaudRate=baud;
+  if(HAL_UART_Init(&huart6)!=HAL_OK) return 0;
+  __HAL_UART_CLEAR_OREFLAG(&huart6);
+  __HAL_UART_SEND_REQ(&huart6,UART_RXDATA_FLUSH_REQUEST);
+  phone_arm();return 1;
 }
 static int bluetooth_filter(uint8_t byte, uint32_t now)
 {return bt_boot_byte(&bluetooth,byte,now);}
@@ -230,6 +239,7 @@ void sensor_stage1_init(void)
   service_phone_init(phone_transmit);phone_arm();
   uint8_t name[3];service_device_name(name);
   bt_boot_init(&bluetooth,name,HAL_GetTick(),bluetooth_send,0);
+  bt_boot_set_uart(&bluetooth,bluetooth_baud);
   service_set_phone_filter(bluetooth_filter);
   if(HAL_UART_Receive_IT(&huart3,&rx_byte,1)!=HAL_OK) Error_Handler();
   last_tick=last_refresh=HAL_GetTick();

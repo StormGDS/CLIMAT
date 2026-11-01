@@ -1,5 +1,8 @@
 #include "bt_boot.h"
 #include <string.h>
+static const uint32_t bauds[]={9600,19200,38400,57600,115200,4800,2400,1200};
+void bt_boot_set_uart(BtBoot *b, int (*set_baud)(void *,uint32_t))
+{b->set_baud=set_baud;}
 unsigned bt_boot_busy(const BtBoot *b) {return b->state<BT_READY;}
 const char *bt_boot_status(const BtBoot *b)
 {
@@ -13,7 +16,7 @@ const char *bt_boot_status(const BtBoot *b)
 void bt_boot_init(BtBoot *b, const uint8_t name[3], uint32_t now,
                   int (*send)(void *,const char *), void *context)
 {
-  memset(b,0,sizeof(*b));b->send=send;b->context=context;b->started=now;
+  memset(b,0,sizeof(*b));b->send=send;b->context=context;b->started=now;b->baud=9600;
   memcpy(b->name,"CLM-",4);
   static const char hex[]="0123456789ABCDEF";
   for(unsigned i=0;i<3;++i) {b->name[4+2*i]=hex[name[i]>>4];b->name[5+2*i]=hex[name[i]&15];}
@@ -45,6 +48,18 @@ static void enter(BtBoot *b, unsigned state, uint32_t now)
     else if(setting(state)) ++b->writes;
   }
 }
+static void next_baud(BtBoot *b, uint32_t now)
+{
+  if(!b->set_baud) {b->state=BT_NO_AT;return;}
+  if(++b->baud_index>=sizeof(bauds)/sizeof(bauds[0])) {
+    b->baud=9600;
+    b->state=b->set_baud(b->context,b->baud)?BT_NO_AT:BT_FAILED;
+    return;
+  }
+  b->baud=bauds[b->baud_index];
+  if(!b->set_baud(b->context,b->baud)) {b->state=BT_FAILED;return;}
+  enter(b,BT_UART_WAIT,now);
+}
 static int line(const BtBoot *b, const char *prefix, const char *value)
 {
   size_t p=strlen(prefix),v=strlen(value);
@@ -73,6 +88,9 @@ static void response(BtBoot *b, uint32_t now)
   /* A setter may reboot the module or emit an unreliable ACK. Verify actual
    * values after its restart/EEPROM settling time, regardless of its ACK. */
   if(setting(b->state)) {verify_after_write(b,now);return;}
+  if(b->state==BT_PROBE && b->set_baud && !line(b,"","OK")) {
+    b->used=0;b->response[0]=0;return;
+  }
   if(line(b,"","ERROR")) {b->state=b->state==BT_VERSION?BT_UNSUPPORTED:BT_FAILED;return;}
   switch(b->state) {
   case BT_PROBE:
@@ -111,9 +129,13 @@ static void response(BtBoot *b, uint32_t now)
 void bt_boot_poll(BtBoot *b, uint32_t now)
 {
   if(!bt_boot_busy(b)) return;
-  if((uint32_t)(now-b->started)>=6500) {b->state=BT_FAILED;return;}
+  if((uint32_t)(now-b->started)>=(b->set_baud?13000U:6500U)) {b->state=BT_FAILED;return;}
   if(b->state==BT_POWER_WAIT) {
     if((uint32_t)(now-b->started)>=500) enter(b,BT_PROBE,now);
+    return;
+  }
+  if(b->state==BT_UART_WAIT) {
+    if((uint32_t)(now-b->at)>=50) enter(b,BT_PROBE,now);
     return;
   }
   if(b->state==BT_RESET_WAIT) {
@@ -130,6 +152,7 @@ void bt_boot_poll(BtBoot *b, uint32_t now)
   if(setting(b->state)) {verify_after_write(b,now);return;}
   if(b->state==BT_PROBE || b->state==BT_WRITE_PROBE) {
     if(!b->retried) {unsigned state=b->state;enter(b,state,now);b->retried=1;}
+    else if(b->state==BT_PROBE && !b->present) next_baud(b,now);
     else b->state=b->state==BT_PROBE?BT_NO_AT:BT_FAILED;
   } else b->state=BT_FAILED;
 }
@@ -138,11 +161,12 @@ int bt_boot_byte(BtBoot *b, uint8_t byte, uint32_t now)
   if(!bt_boot_busy(b)) return 0;
   /* A phone may already be connected across an MCU-only reset. Stop AT
    * configuration immediately and let a framed request reach the parser. */
-  if(!byte) {b->state=BT_LINK_ACTIVE;return 0;}
-  if(b->state==BT_POWER_WAIT) return 1;
+  if(!byte && !(b->set_baud && !b->present && b->baud_index)) {b->state=BT_LINK_ACTIVE;return 0;}
+  if(b->state==BT_POWER_WAIT || b->state==BT_UART_WAIT) return 1;
   if(b->state==BT_RESET_WAIT) return 1;
   if(b->state==BT_WRITE_WAIT) return 1;
   if(b->used==sizeof(b->response)-1 || (byte<32 && byte!='\r' && byte!='\n')) {
+    if(b->set_baud && b->state==BT_PROBE && !b->present) {b->used=0;b->response[0]=0;return 1;}
     b->state=BT_FAILED;return 1;
   }
   b->response[b->used++]=(char)byte;b->response[b->used]=0;b->last_rx=now;return 1;
