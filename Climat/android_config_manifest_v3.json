@@ -1,0 +1,206 @@
+{
+  "protocol_version": 3,
+  "flash_version": 5,
+  "endianness": "little",
+  "set_config_opcode": 5,
+  "set_payload_bytes": 31,
+  "get_config_opcode": 4,
+  "get_reply_payload_bytes": 40,
+  "status_offset": 0,
+  "fields": [
+    {
+      "name": "heat1_on",
+      "set_offset": 0,
+      "get_offset": 1,
+      "type": "i16",
+      "unit": "1/16 degC",
+      "validation": "See temperature_constraints"
+    },
+    {
+      "name": "heat1_hyst",
+      "set_offset": 2,
+      "get_offset": 3,
+      "type": "i16",
+      "unit": "1/16 degC",
+      "validation": "See temperature_constraints"
+    },
+    {
+      "name": "heat2_on",
+      "set_offset": 4,
+      "get_offset": 5,
+      "type": "i16",
+      "unit": "1/16 degC",
+      "validation": "See temperature_constraints"
+    },
+    {
+      "name": "heat2_hyst",
+      "set_offset": 6,
+      "get_offset": 7,
+      "type": "i16",
+      "unit": "1/16 degC",
+      "validation": "See temperature_constraints"
+    },
+    {
+      "name": "cool1_on",
+      "set_offset": 8,
+      "get_offset": 9,
+      "type": "i16",
+      "unit": "1/16 degC",
+      "validation": "See temperature_constraints"
+    },
+    {
+      "name": "cool1_hyst",
+      "set_offset": 10,
+      "get_offset": 11,
+      "type": "i16",
+      "unit": "1/16 degC",
+      "validation": "See temperature_constraints"
+    },
+    {
+      "name": "cool2_on",
+      "set_offset": 12,
+      "get_offset": 13,
+      "type": "i16",
+      "unit": "1/16 degC",
+      "validation": "See temperature_constraints"
+    },
+    {
+      "name": "cool2_hyst",
+      "set_offset": 14,
+      "get_offset": 15,
+      "type": "i16",
+      "unit": "1/16 degC",
+      "validation": "See temperature_constraints"
+    },
+    {
+      "name": "cooling_milli_per_min",
+      "set_offset": 16,
+      "get_offset": 17,
+      "type": "u16",
+      "unit": "0.001 degC/min",
+      "min": 0,
+      "max": 65535
+    },
+    {
+      "name": "fail_count",
+      "set_offset": 18,
+      "get_offset": 19,
+      "type": "u8",
+      "unit": "samples",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "name": "recover_count",
+      "set_offset": 19,
+      "get_offset": 20,
+      "type": "u8",
+      "unit": "samples",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "name": "alternate",
+      "set_offset": 20,
+      "get_offset": 21,
+      "type": "u8",
+      "unit": "boolean",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "name": "manual_seconds",
+      "set_offset": 21,
+      "get_offset": 22,
+      "type": "u16",
+      "unit": "seconds",
+      "min": 1,
+      "max": 3600
+    },
+    {
+      "name": "rising_milli_per_min",
+      "set_offset": 23,
+      "get_offset": 24,
+      "type": "u16",
+      "unit": "0.001 degC/min",
+      "min": 0,
+      "max": 65535
+    },
+    {
+      "name": "rate_hyst_milli_per_min",
+      "set_offset": 25,
+      "get_offset": 26,
+      "type": "u16",
+      "unit": "0.001 degC/min",
+      "min": 0,
+      "max": 65535
+    },
+    {
+      "name": "heater_min_on_seconds",
+      "set_offset": 27,
+      "get_offset": 28,
+      "type": "u16",
+      "unit": "seconds",
+      "min": 1,
+      "max": 600
+    },
+    {
+      "name": "fan_min_on_seconds",
+      "set_offset": 29,
+      "get_offset": 30,
+      "type": "u16",
+      "unit": "seconds",
+      "min": 1,
+      "max": 600
+    }
+  ],
+  "readonly": [
+    {
+      "name": "trend_window_seconds",
+      "get_offset": 32,
+      "type": "u16",
+      "value": 5
+    },
+    {
+      "name": "heat2_min_raw16",
+      "get_offset": 34,
+      "type": "i16",
+      "value": 168
+    },
+    {
+      "name": "heater_min_off_seconds",
+      "get_offset": 36,
+      "type": "u16",
+      "value": 30
+    },
+    {
+      "name": "fan_min_off_seconds",
+      "get_offset": 38,
+      "type": "u16",
+      "value": 60
+    }
+  ],
+  "temperature_constraints": [
+    "all temperature hyst >0",
+    "168<=heat2_on<=heat1_on",
+    "heat2_on+heat2_hyst<=heat1_on+heat1_hyst",
+    "cool1_on<=cool2_on<=2000",
+    "cool1_on-cool1_hyst<=cool2_on-cool2_hyst",
+    "heat1_on+heat1_hyst<cool1_on-cool1_hyst"
+  ],
+  "rate_constraints": [
+    "R=0 disables rising limit",
+    "S=0 disables early cooling demand",
+    "R>0 implies H<=R",
+    "S>0 implies H<=S",
+    "H=0 assertion wins on coincident threshold"
+  ],
+  "migration": {
+    "R": 0,
+    "H": 0,
+    "heater_min_on_seconds": 30,
+    "fan_min_on_seconds": 60
+  },
+  "legacy_protocol": "Reject v1/v2 with status VERSION=8 in v3 reply; old 23-byte payload in v3 gets BAD_PAYLOAD=1",
+  "vectors": "tests/phone_vectors.json"
+}

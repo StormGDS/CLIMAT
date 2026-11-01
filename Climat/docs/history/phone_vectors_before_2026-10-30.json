@@ -1,0 +1,114 @@
+[
+  {
+    "name": "hello_request",
+    "opcode": 1,
+    "sequence": 1,
+    "payload_hex": "",
+    "raw_hex": "0101010000D9FA",
+    "wire_hex": "00040101010103D9FA00"
+  },
+  {
+    "name": "hello_locked_reply",
+    "opcode": 129,
+    "sequence": 1,
+    "payload_hex": "000140051E07030204",
+    "raw_hex": "0181010009000140051E07030204E438",
+    "wire_hex": "000401810102090B0140051E07030204E43800"
+  },
+  {
+    "name": "status_request",
+    "opcode": 2,
+    "sequence": 2,
+    "payload_hex": "",
+    "raw_hex": "01020200005538",
+    "wire_hex": "00040102020103553800"
+  },
+  {
+    "name": "sensors_request",
+    "opcode": 3,
+    "sequence": 3,
+    "payload_hex": "",
+    "raw_hex": "0103030000D179",
+    "wire_hex": "00040103030103D17900"
+  },
+  {
+    "name": "config_request",
+    "opcode": 4,
+    "sequence": 4,
+    "payload_hex": "",
+    "raw_hex": "01040400006CAD",
+    "wire_hex": "000401040401036CAD00"
+  },
+  {
+    "name": "mode_manual",
+    "opcode": 9,
+    "sequence": 5,
+    "payload_hex": "01",
+    "raw_hex": "010905000101997C",
+    "wire_hex": "0004010905050101997C00"
+  },
+  {
+    "name": "relay1_on",
+    "opcode": 10,
+    "sequence": 6,
+    "payload_hex": "0101",
+    "raw_hex": "010A0600020101584F",
+    "wire_hex": "0004010A0606020101584F00"
+  },
+  {
+    "name": "mode_auto",
+    "opcode": 9,
+    "sequence": 7,
+    "payload_hex": "00",
+    "raw_hex": "010907000100D081",
+    "wire_hex": "0004010907020103D08100"
+  },
+  {
+    "name": "save_request",
+    "opcode": 6,
+    "sequence": 8,
+    "payload_hex": "",
+    "raw_hex": "01060800006535",
+    "wire_hex": "00040106080103653500"
+  },
+  {
+    "name": "get_device_name",
+    "opcode": 12,
+    "sequence": 9,
+    "payload_hex": "",
+    "raw_hex": "010C090000FE6A",
+    "wire_hex": "0004010C090103FE6A00"
+  },
+  {
+    "name": "get_unassigned_device_name_reply",
+    "opcode": 140,
+    "sequence": 9,
+    "payload_hex": "00000000",
+    "raw_hex": "018C09000400000000ADBD",
+    "wire_hex": "0004018C09020401010103ADBD00"
+  },
+  {
+    "name": "set_device_name_A01",
+    "opcode": 13,
+    "sequence": 10,
+    "payload_hex": "413031",
+    "raw_hex": "010D0A00034130314388",
+    "wire_hex": "0004010D0A0703413031438800"
+  },
+  {
+    "name": "set_device_name_reply",
+    "opcode": 141,
+    "sequence": 10,
+    "payload_hex": "00",
+    "raw_hex": "018D0A0001008013",
+    "wire_hex": "0004018D0A020103801300"
+  },
+  {
+    "name": "hello_enabled_reply",
+    "opcode": 129,
+    "sequence": 1,
+    "payload_hex": "000140051E06030204",
+    "raw_hex": "0181010009000140051E06030204504E",
+    "wire_hex": "000401810102090B0140051E06030204504E00"
+  }
+]

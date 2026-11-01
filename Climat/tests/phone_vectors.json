@@ -1,0 +1,110 @@
+[
+  {
+    "name": "hello_request",
+    "version": 3,
+    "opcode": 1,
+    "sequence": 1,
+    "payload_hex": "",
+    "raw_hex": "03010100005ABE",
+    "wire_hex": "000403010101035ABE00"
+  },
+  {
+    "name": "hello_locked_reply",
+    "version": 3,
+    "opcode": 129,
+    "sequence": 1,
+    "payload_hex": "000340050F050204",
+    "raw_hex": "0381010008000340050F050204F637",
+    "wire_hex": "000403810102080A0340050F050204F63700"
+  },
+  {
+    "name": "hello_enabled_reply",
+    "version": 3,
+    "opcode": 129,
+    "sequence": 1,
+    "payload_hex": "000340050E050204",
+    "raw_hex": "0381010008000340050E0502044241",
+    "wire_hex": "000403810102080A0340050E050204424100"
+  },
+  {
+    "name": "config_request",
+    "version": 3,
+    "opcode": 4,
+    "sequence": 4,
+    "payload_hex": "",
+    "raw_hex": "0304040000EFE9",
+    "wire_hex": "00040304040103EFE900"
+  },
+  {
+    "name": "set_config_request",
+    "version": 3,
+    "opcode": 5,
+    "sequence": 5,
+    "payload_hex": "B0000800A80008009001100030021000C8000302005802E80364001E003C00",
+    "raw_hex": "030505001FB0000800A80008009001100030021000C8000302005802E80364001E003C007C38",
+    "wire_hex": "0004030505031FB0020802A80208049001100430021002C8030302065802E80364021E023C037C3800"
+  },
+  {
+    "name": "config_reply",
+    "version": 3,
+    "opcode": 132,
+    "sequence": 4,
+    "payload_hex": "00B0000800A80008009001100030021000C8000302005802E80364001E003C000500A8001E003C00",
+    "raw_hex": "038404002800B0000800A80008009001100030021000C8000302005802E80364001E003C000500A8001E003C00C493",
+    "wire_hex": "0004038404022802B0020802A80208049001100430021002C8030302065802E80364021E023C020502A8021E023C03C49300"
+  },
+  {
+    "name": "get_bindings_request",
+    "version": 3,
+    "opcode": 14,
+    "sequence": 14,
+    "payload_hex": "",
+    "raw_hex": "030E0E00008546",
+    "wire_hex": "0004030E0E0103854600"
+  },
+  {
+    "name": "set_bindings_request",
+    "version": 3,
+    "opcode": 15,
+    "sequence": 15,
+    "payload_hex": "28010000000000292802000000000070",
+    "raw_hex": "030F0F001028010000000000292802000000000070E93F",
+    "wire_hex": "0004030F0F041028010101010104292802010101010470E93F00"
+  },
+  {
+    "name": "get_bindings_reply",
+    "version": 3,
+    "opcode": 142,
+    "sequence": 14,
+    "payload_hex": "0028010000000000292802000000000070",
+    "raw_hex": "038E0E0011002801000000000029280200000000007066E9",
+    "wire_hex": "0004038E0E0211032801010101010429280201010101047066E900"
+  },
+  {
+    "name": "version_rejected_reply",
+    "version": 3,
+    "opcode": 129,
+    "sequence": 1,
+    "payload_hex": "08",
+    "raw_hex": "038101000108FC8C",
+    "wire_hex": "0004038101050108FC8C00"
+  },
+  {
+    "name": "maximum_payload",
+    "version": 3,
+    "opcode": 1,
+    "sequence": 65535,
+    "payload_hex": "000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F202122232425262728292A2B2C2D2E2F303132333435363738393A3B3C3D3E3F",
+    "raw_hex": "0301FFFF40000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F202122232425262728292A2B2C2D2E2F303132333435363738393A3B3C3D3E3F0179",
+    "wire_hex": "00060301FFFF40420102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F202122232425262728292A2B2C2D2E2F303132333435363738393A3B3C3D3E3F017900"
+  },
+  {
+    "name": "wrap_sequence",
+    "version": 3,
+    "opcode": 2,
+    "sequence": 0,
+    "payload_hex": "",
+    "raw_hex": "0302000000B612",
+    "wire_hex": "00030302010103B61200"
+  }
+]

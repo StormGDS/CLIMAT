@@ -1,0 +1,5 @@
+Climat/build/
+Climat/targets/stm32f030f4/build*/
+Climat/test-runtime/
+**/__pycache__/
+*.log
